@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 环境与配置（敏感）
+.env
+*.local
+deployment/.env
+
+# 证书（本地自签，勿提交）
+deployment/certs/
+
+# 数据与备份（含审批/审计业务数据，禁止提交）
+data/
+backups/
+*.json.bak
+
+# 测试与临时产物
+.pytest_cache/
+.coverage
+htmlcov/
+Temp/
+.ruff_cache/
+
+# 文档/报告生成物（本地渲染产物，非源码）
+_documentation/miirp-doc-review/
+_documentation/miirp-prod-readiness/
+_documentation/miirp-intro/
+.trae-html-share-packages/
+
+# IDE
+.idea/
+.vscode/
+*.swp

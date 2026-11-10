@@ -1,0 +1,93 @@
+# MIIRP 配置基线（default.yaml）—— 分层：default → {env}.yaml → MIIRP_ 环境变量（最高优先级）
+# 约定：密钥与连接串只经环境变量注入，yaml 不写 $VAR 插值（无插值，避免误导，D12）。
+
+server:
+  transport: streamable-http      # stdio | streamable-http
+  host: 0.0.0.0
+  port: 8000
+  version: 3.1.0                  # D31：全项目统一版本号
+  mask_error_details: true        # 对外错误信息脱敏
+  max_body_bytes: 1048576         # 请求体大小上限（1 MiB，网关层 Nginx 执行，此处留存配置）
+
+logging:
+  level: INFO                     # DEBUG | INFO | WARNING | ERROR
+  json: true                      # JSON 结构化日志（stdout，含 trace_id）
+
+auth:
+  mode: lightweight               # lightweight | oauth
+  api_key_header: X-MIIRP-Key     # lightweight 模式下的密钥头
+
+rate_limit:
+  qps: 20                         # 每 client_id 每秒请求上限（滑动窗口）
+  window_seconds: 60
+
+roles:                            # 角色 → 工具白名单（最小可见，工具名集合）
+  grn-operator:
+    - get_po
+    - create_grn
+  iqc-inspector:
+    - get_grn
+    - create_iqc_report
+  warehouse-manager:
+    - get_inventory
+    - list_low_stock_materials
+    - create_inbound_record
+    - approve_inbound_request
+    - list_pending_approvals
+    - notify
+  buyer:
+    - get_inventory
+    - get_supplier_quote
+    - notify
+  compliance-officer:
+    - get_supplier_profile
+    - get_trace_batch
+    - create_inbound_record
+    - approve_inbound_request
+    - list_pending_approvals
+    - notify
+  qty-check-agent:
+    - get_po
+    - get_grn
+  price-check-agent:
+    - get_supplier_quote
+  supplier-check-agent:
+    - get_supplier_profile
+  trace-check-agent:
+    - get_trace_batch
+  review-agent:
+    - create_inbound_record
+    - notify
+  inventory-agent:
+    - get_inventory
+    - list_low_stock_materials
+    - get_stock_usage
+    - notify
+
+approval:
+  write_tools:
+    - create_inbound_record
+  high_value_threshold_cny: 100000.0   # 双人审批阈值（折合人民币）
+  timeout_seconds: 120                 # 审批等待上限（轮询间隔 0.5s，生产可换回调）
+  approve_roles:                       # 可执行审批决策的角色
+    - warehouse-manager
+    - compliance-officer
+
+database:
+  dsn: sqlite:///data/miirp.db         # 本地默认；生产用 MIIRP_DB_DSN 环境变量覆盖（字面量，无插值）
+
+audit:
+  retention_days: 180
+
+metrics:
+  enabled: true
+  auth: false                      # /metrics 端点鉴权（P3 整改；生产 production.yaml 开启）
+  latency_buckets_ms: [5, 10, 25, 50, 100, 250, 500, 1000, 2500]  # 直方图分桶
+  window_size: 5000                    # 延迟采样窗口上限（防内存泄漏，D13）
+
+agents:
+  llm_mode: mock                       # mock | openai-compatible
+  llm_base_url: ""
+  llm_model: your-llm-model
+  llm_timeout_seconds: 30
+  max_tool_calls: 8                    # 单 Agent 单轮最多工具调用数

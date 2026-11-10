@@ -1,0 +1,25 @@
+# MIIRP 生产覆盖（production.yaml）—— 覆盖 default.yaml，MIIRP_ 环境变量仍为最高优先级
+# 约定：生产 DSN 一律由环境变量 MIIRP_DB_DSN 注入，禁止写死在 yaml（D12）。
+
+server:
+  transport: streamable-http
+  host: 0.0.0.0
+  port: 8000
+
+logging:
+  level: INFO
+
+auth:
+  mode: lightweight
+
+rate_limit:
+  qps: 50
+
+metrics:
+  auth: true                        # P3 整改：生产环境 /metrics 需 X-MIIRP-Key 鉴权
+
+database:
+  dsn: ""     # 生产 DSN 一律由环境变量 MIIRP_DB_DSN 注入，禁止写死在 yaml
+
+audit:
+  retention_days: 365

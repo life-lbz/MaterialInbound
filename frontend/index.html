@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIIRP · 物料入库智能审查平台 · 控制台</title>
+<style>
+/* ============================================================
+   MIIRP Console — 工业精密仪器 / HMI 控制台设计系统
+   ============================================================ */
+:root{
+  --bg0:#0a0e12; --bg1:#0f151b; --bg2:#141c24; --bg3:#1a2430;
+  --line:#1f2c3a; --line2:#2b3b4d; --line3:#3a4d61;
+  --tx0:#e9eff5; --tx1:#aebccb; --tx2:#6f8094; --tx3:#46586c;
+  --amber:#ffb224; --green:#3ec59a; --red:#e5534b; --blue:#4da3ff;
+  --violet:#8f7bf5; --cyan:#3ec7d8;
+  --mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,Consolas,"Courier New",monospace;
+  --sans:"Noto Sans SC","Source Han Sans SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  --grid:36px;
+  --shadow:0 18px 50px -20px rgba(0,0,0,.65);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg0);color:var(--tx0);
+  font-family:var(--sans);font-size:14px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+/* 工业网格 + 暗角背景 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    linear-gradient(rgba(77,163,255,.028) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(77,163,255,.028) 1px,transparent 1px);
+  background-size:var(--grid) var(--grid);
+  mask-image:radial-gradient(ellipse 90% 80% at 50% 0%,#000 40%,transparent 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(1200px 700px at 75% -10%,rgba(62,197,154,.05),transparent 60%),
+             radial-gradient(900px 600px at 0% 110%,rgba(255,178,36,.04),transparent 60%);
+}
+::selection{background:rgba(255,178,36,.28)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--line2);border:2px solid var(--bg1);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--line3)}
+
+/* ---------- 通用元件 ---------- */
+.mono{font-family:var(--mono)}
+.kicker{
+  font-family:var(--mono);font-size:11px;letter-spacing:.28em;
+  color:var(--amber);text-transform:uppercase;display:flex;align-items:center;gap:10px;
+}
+.kicker::before{content:"";width:22px;height:1px;background:var(--amber);opacity:.7}
+.kicker.muted{color:var(--tx2)} .kicker.muted::before{background:var(--tx2)}
+h2.title{font-size:22px;font-weight:600;letter-spacing:.02em;margin:6px 0 2px}
+p.sub{color:var(--tx1);font-size:13px;max-width:720px}
+.view-head{margin-bottom:22px}
+
+.panel{
+  position:relative;background:linear-gradient(180deg,var(--bg2),var(--bg1));
+  border:1px solid var(--line);border-radius:4px;
+}
+/* 端子装饰：面板四角小方块（工业接线端子隐喻） */
+.panel::before,.panel::after{
+  content:"";position:absolute;width:7px;height:7px;border:1px solid var(--line3);
+  border-radius:1px;pointer-events:none;transition:border-color .3s;
+}
+.panel::before{top:7px;left:7px;border-right:none;border-bottom:none}
+.panel::after{bottom:7px;right:7px;border-left:none;border-top:none}
+.panel.hoverable{cursor:pointer;transition:border-color .25s,transform .25s,box-shadow .25s}
+.panel.hoverable:hover{border-color:var(--line3);transform:translateY(-1px);box-shadow:var(--shadow)}
+
+.panel-hd{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;
+  border-bottom:1px solid var(--line);
+}
+.panel-hd .tag{
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--tx2);
+  padding:2px 8px;border:1px solid var(--line2);border-radius:2px;background:var(--bg1);
+}
+.panel-hd h3{font-size:13px;font-weight:600;letter-spacing:.08em;color:var(--tx0)}
+.panel-bd{padding:16px}
+
+/* 按钮 */
+.btn{
+  font-family:var(--mono);font-size:12px;letter-spacing:.06em;
+  padding:7px 14px;border:1px solid var(--line2);border-radius:3px;
+  background:var(--bg2);color:var(--tx0);cursor:pointer;
+  transition:border-color .2s,background .2s,color .2s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--line3);background:var(--bg3)}
+.btn.primary{border-color:rgba(255,178,36,.55);color:var(--amber);background:rgba(255,178,36,.08)}
+.btn.primary:hover{background:rgba(255,178,36,.16)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--tx1)}
+.btn.ghost:hover{color:var(--tx0);background:var(--bg2)}
+.btn.ok{border-color:rgba(62,197,154,.55);color:var(--green);background:rgba(62,197,154,.08)}
+.btn.ok:hover{background:rgba(62,197,154,.16)}
+.btn.danger{border-color:rgba(229,83,75,.5);color:var(--red);background:rgba(229,83,75,.07)}
+.btn.danger:hover{background:rgba(229,83,75,.15)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* 信号灯 */
+.lamp{width:8px;height:8px;border-radius:50%;display:inline-block;position:relative;flex:none}
+.lamp.green{background:var(--green);box-shadow:0 0 8px rgba(62,197,154,.8)}
+.lamp.amber{background:var(--amber);box-shadow:0 0 8px rgba(255,178,36,.8);animation:pulse 1.4s infinite}
+.lamp.red{background:var(--red);box-shadow:0 0 8px rgba(229,83,75,.8);animation:pulse .9s infinite}
+.lamp.off{background:var(--tx3);box-shadow:none}
+.lamp.blue{background:var(--blue);box-shadow:0 0 8px rgba(77,163,255,.7)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* 徽标块 */
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;
+  padding:2px 8px;border-radius:2px;border:1px solid var(--line2);color:var(--tx1);
+}
+.chip.green{color:var(--green);border-color:rgba(62,197,154,.4);background:rgba(62,197,154,.07)}
+.chip.red{color:var(--red);border-color:rgba(229,83,75,.4);background:rgba(229,83,75,.07)}
+.chip.amber{color:var(--amber);border-color:rgba(255,178,36,.4);background:rgba(255,178,36,.07)}
+.chip.blue{color:var(--blue);border-color:rgba(77,163,255,.4);background:rgba(77,163,255,.07)}
+.chip.violet{color:var(--violet);border-color:rgba(143,123,245,.4);background:rgba(143,123,245,.07)}
+
+/* ============================================================
+   顶栏
+   ============================================================ */
+.topbar{
+  position:relative;z-index:30;height:54px;
+  display:flex;align-items:center;gap:18px;padding:0 18px;
+  background:linear-gradient(180deg,#111820,#0d131a);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex;align-items:center;gap:11px;flex:none}
+.brand-mark{
+  width:30px;height:30px;flex:none;position:relative;
+  border:1px solid var(--amber);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,178,36,.06);
+}
+.brand-mark svg{width:17px;height:17px;stroke:var(--amber)}
+.brand-name{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.14em}
+.brand-name em{font-style:normal;color:var(--amber)}
+.brand-sub{font-size:10px;color:var(--tx2);letter-spacing:.22em;margin-top:1px}
+.topbar .sep{width:1px;height:26px;background:var(--line2)}
+.service-state{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--tx1)}
+.service-state .state-txt{letter-spacing:.08em}
+.service-state .db-txt{color:var(--tx2);font-size:10.5px}
+.topbar .grow{flex:1}
+.topbar .meta{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:11px;color:var(--tx2);letter-spacing:.06em}
+.topbar .meta b{color:var(--tx1);font-weight:500}
+.ver-tag{padding:3px 8px;border:1px solid var(--line2);border-radius:2px;background:var(--bg1)}
+
+/* ============================================================
+   外壳：侧栏 + 主区
+   ============================================================ */
+.shell{position:relative;z-index:10;display:flex;height:calc(100% - 54px)}
+.nav{
+  width:206px;flex:none;background:var(--bg1);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:14px 10px;
+}
+.nav-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--tx3);
+  padding:4px 10px 8px;text-transform:uppercase;
+}
+.nav-item{
+  position:relative;display:flex;align-items:center;gap:11px;
+  padding:9px 11px;margin-bottom:2px;border-radius:3px;
+  font-size:13px;color:var(--tx1);cursor:pointer;border:1px solid transparent;
+  transition:background .2s,color .2s;
+}
+.nav-item .idx{font-family:var(--mono);font-size:10px;color:var(--tx3);letter-spacing:.1em;width:14px}
+.nav-item svg{width:15px;height:15px;stroke:var(--tx2);flex:none;transition:stroke .2s}
+.nav-item:hover{background:var(--bg2);color:var(--tx0)}
+.nav-item.active{background:linear-gradient(90deg,rgba(255,178,36,.1),transparent 75%);color:var(--tx0);border-color:var(--line)}
+.nav-item.active::before{
+  content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:2px;background:var(--amber);
+  box-shadow:0 0 8px rgba(255,178,36,.7);
+}
+.nav-item.active .idx{color:var(--amber)}
+.nav-item.active svg{stroke:var(--amber)}
+.nav-item .badge{
+  margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--amber);
+  background:rgba(255,178,36,.1);border:1px solid rgba(255,178,36,.35);
+  border-radius:8px;padding:0 6px;min-width:18px;text-align:center;
+}
+.nav-foot{margin-top:auto;padding:12px 11px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10px;color:var(--tx3);letter-spacing:.12em;line-height:1.9}
+.nav-foot .dim{color:var(--tx3);letter-spacing:.06em}
+
+.main{flex:1;overflow-y:auto;padding:26px 30px 60px;position:relative}
+.view{display:none;animation:viewIn .35s cubic-bezier(.2,.7,.3,1)}
+.view.active{display:block}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   总览页
+   ============================================================ */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
+.kpi{position:relative;padding:14px 15px 13px;background:linear-gradient(180deg,var(--bg2),var(--bg1));border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--amber);opacity:.85}
+.kpi.green::before{background:var(--green)} .kpi.red::before{background:var(--red)} .kpi.blue::before{background:var(--blue)} .kpi.violet::before{background:var(--violet)}
+.kpi .k-label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--tx2);text-transform:uppercase}
+.kpi .k-value{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:.02em;margin-top:6px;line-height:1}
+.kpi .k-value small{font-size:12px;color:var(--tx2);font-weight:400;margin-left:2px}
+.kpi .k-note{font-size:11px;color:var(--tx3);margin-top:6px;letter-spacing:.02em}
+.kpi .k-dot{position:absolute;right:12px;top:12px}
+
+.flow-band{margin-bottom:22px;padding:20px 22px}
+.flow-track{display:flex;align-items:stretch;gap:0;margin-top:16px}
+.flow-node{flex:1;position:relative;padding:0 6px}
+.flow-node .node-box{
+  height:100%;min-height:96px;padding:14px 14px 12px;border-radius:4px;
+  background:var(--bg1);border:1px solid var(--line2);
+  display:flex;flex-direction:column;gap:7px;transition:border-color .25s;
+}
+.flow-node:hover .node-box{border-color:var(--line3)}
+.flow-node .n-seq{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--tx3)}
+.flow-node .n-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.flow-node .n-name .lamp{margin-left:auto}
+.flow-node .n-doc{font-family:var(--mono);font-size:11px;color:var(--tx1)}
+.flow-node .n-meta{font-family:var(--mono);font-size:10px;color:var(--tx3);letter-spacing:.04em}
+.flow-node.done .node-box{border-color:rgba(62,197,154,.4)}
+.flow-node.warn .node-box{border-color:rgba(255,178,36,.5)}
+.flow-node.fail .node-box{border-color:rgba(229,83,75,.5)}
+.flow-conn{
+  flex:none;width:34px;display:flex;align-items:center;justify-content:center;position:relative;
+}
+.flow-conn::before{content:"";width:100%;height:1px;background:var(--line3)}
+.flow-conn::after{
+  content:"";position:absolute;right:-2px;width:5px;height:5px;
+  border-top:1px solid var(--line3);border-right:1px solid var(--line3);transform:rotate(45deg);
+}
+.flow-conn.pass::before{background:var(--green);box-shadow:0 0 6px rgba(62,197,154,.6)}
+.flow-conn.pass::after{border-color:var(--green)}
+.flow-conn.block::before{background:var(--red);box-shadow:0 0 6px rgba(229,83,75,.6)}
+.flow-conn.block::after{border-color:var(--red)}
+
+.overview-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;margin-bottom:22px}
+.gov-list{display:flex;flex-direction:column}
+.gov-row{display:flex;align-items:center;gap:13px;padding:11px 4px;border-bottom:1px dashed var(--line)}
+.gov-row:last-child{border-bottom:none}
+.gov-row .g-seq{font-family:var(--mono);font-size:10px;color:var(--amber);width:26px;flex:none}
+.gov-row .g-name{font-family:var(--mono);font-size:12.5px;color:var(--tx0);width:150px;flex:none;letter-spacing:.04em}
+.gov-row .g-desc{font-size:12px;color:var(--tx1);flex:1}
+.gov-row .g-stat{font-family:var(--mono);font-size:10.5px;color:var(--tx2);flex:none}
+
+.act-list{display:flex;flex-direction:column}
+.act-row{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px dashed var(--line);font-family:var(--mono);font-size:11.5px}
+.act-row:last-child{border-bottom:none}
+.act-row .a-time{color:var(--tx3);flex:none}
+.act-row .a-tool{color:var(--blue);flex:none;min-width:130px}
+.act-row .a-role{color:var(--tx2);flex:none}
+.act-row .a-msg{color:var(--tx1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act-row .a-status{margin-left:auto}
+
+/* ============================================================
+   审批中心
+   ============================================================ */
+.approval-layout{display:grid;grid-template-columns:1fr 330px;gap:22px}
+.fsm-panel{position:sticky;top:0}
+.fsm-track{position:relative;margin:20px 4px 8px}
+.fsm-step{display:flex;gap:14px;position:relative;padding-bottom:26px}
+.fsm-step:not(:last-child)::before{
+  content:"";position:absolute;left:11px;top:24px;bottom:0;width:1px;background:var(--line2);
+}
+.fsm-step .f-dot{
+  width:23px;height:23px;flex:none;border-radius:50%;border:1px solid var(--line3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10px;color:var(--tx2);background:var(--bg1);position:relative;z-index:1;
+}
+.fsm-step.active .f-dot{border-color:var(--amber);color:var(--amber);background:rgba(255,178,36,.08);box-shadow:0 0 10px rgba(255,178,36,.35)}
+.fsm-step.done .f-dot{border-color:var(--green);color:var(--green);background:rgba(62,197,154,.08)}
+.fsm-step.fail .f-dot{border-color:var(--red);color:var(--red);background:rgba(229,83,75,.08)}
+.fsm-step .f-body{flex:1;padding-top:2px}
+.fsm-step .f-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.fsm-step .f-desc{font-size:11.5px;color:var(--tx2);margin-top:2px;line-height:1.6}
+.fsm-note{font-size:11px;color:var(--tx3);padding-left:37px;font-family:var(--mono);letter-spacing:.03em}
+
+.approval-table{width:100%;border-collapse:collapse}
+.approval-table th{
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-align:left;
+  color:var(--tx3);padding:8px 10px;border-bottom:1px solid var(--line2);text-transform:uppercase;
+  font-weight:500;
+}
+.approval-table td{padding:11px 10px;border-bottom:1px solid var(--line);font-size:12.5px;vertical-align:middle}
+.approval-table tr{cursor:pointer;transition:background .15s}
+.approval-table tbody tr:hover{background:var(--bg2)}
+.approval-table .a-id{font-family:var(--mono);color:var(--blue);font-size:12px}
+.approval-table .a-amt{font-family:var(--mono);color:var(--tx0);font-weight:600}
+.approval-table .a-amt.double{color:var(--amber)}
+.empty-tip{padding:40px 20px;text-align:center;color:var(--tx2);font-size:13px}
+.empty-tip .mono{color:var(--tx3);font-size:11px;margin-top:6px}
+
+/* 详情抽屉 */
+.scrim{position:fixed;inset:0;background:rgba(5,8,11,.62);backdrop-filter:blur(2px);z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim.show{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:440px;z-index:61;background:var(--bg1);
+  border-left:1px solid var(--line2);box-shadow:-30px 0 70px -30px rgba(0,0,0,.8);
+  transform:translateX(102%);transition:transform .32s cubic-bezier(.25,.8,.3,1);
+  display:flex;flex-direction:column;
+}
+.drawer.show{transform:none}
+.drawer-hd{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line);flex:none}
+.drawer-hd h3{font-size:15px;font-weight:600;font-family:var(--mono);letter-spacing:.04em}
+.drawer-bd{flex:1;overflow-y:auto;padding:18px}
+.drawer-ft{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex:none}
+.d-field{display:flex;gap:14px;padding:9px 2px;border-bottom:1px dashed var(--line);font-size:12.5px}
+.d-field:last-child{border-bottom:none}
+.d-field .d-k{font-family:var(--mono);font-size:11px;color:var(--tx2);width:118px;flex:none;padding-top:1px;letter-spacing:.04em}
+.d-field .d-v{color:var(--tx0);flex:1;word-break:break-all}
+.d-sec{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;color:var(--amber);margin:18px 0 6px;text-transform:uppercase}
+.d-json{font-family:var(--mono);font-size:11px;line-height:1.75;background:var(--bg0);border:1px solid var(--line);border-radius:3px;padding:12px;color:var(--tx1);overflow-x:auto;white-space:pre}
+
+/* ============================================================
+   业务链路页
+   ============================================================ */
+.path-tabs{display:flex;gap:8px;margin-bottom:18px}
+.path-tab{
+  display:flex;align-items:center;gap:9px;padding:9px 16px;border-radius:3px;
+  border:1px solid var(--line2);background:var(--bg1);cursor:pointer;
+  font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--tx1);
+  transition:border-color .2s,background .2s;
+}
+.path-tab:hover{border-color:var(--line3)}
+.path-tab.active{border-color:var(--amber);background:rgba(255,178,36,.06);color:var(--tx0)}
+.path-tab .lamp{width:7px;height:7px}
+
+.expert-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.expert{padding:15px 16px}
+.expert .e-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.expert .e-name{font-size:13px;font-weight:600}
+.expert .e-role{font-family:var(--mono);font-size:9.5px;color:var(--tx3);letter-spacing:.12em;margin-top:1px}
+.expert .e-risk{margin-left:auto;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:8px;letter-spacing:.06em}
+.e-risk.low{color:var(--green);border:1px solid rgba(62,197,154,.4);background:rgba(62,197,154,.07)}
+.e-risk.high{color:var(--red);border:1px solid rgba(229,83,75,.4);background:rgba(229,83,75,.07)}
+.e-risk.medium{color:var(--amber);border:1px solid rgba(255,178,36,.4);background:rgba(255,178,36,.07)}
+.expert .e-reason{font-size:12px;color:var(--tx1);line-height:1.65}
+.expert .e-data{font-family:var(--mono);font-size:10.5px;color:var(--tx3);margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);letter-spacing:.03em;line-height:1.8}
+
+.decision-band{display:flex;align-items:center;gap:22px;padding:18px 22px;margin-bottom:22px}
+.decision-band .d-badge{
+  font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:.14em;padding:10px 20px;
+  border-radius:3px;flex:none;
+}
+.decision-band .d-badge.approve{color:var(--green);border:1px solid rgba(62,197,154,.5);background:rgba(62,197,154,.08)}
+.decision-band .d-badge.reject{color:var(--red);border:1px solid rgba(229,83,75,.5);background:rgba(229,83,75,.08)}
+.decision-band .d-badge.review{color:var(--amber);border:1px solid rgba(255,178,36,.5);background:rgba(255,178,36,.08)}
+.decision-band .d-info{flex:1;font-size:12.5px;color:var(--tx1)}
+.decision-band .d-info b{color:var(--tx0)}
+.decision-band .d-correlation{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:none}
+
+.doc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.doc-card{padding:14px 16px}
+.doc-card .d-type{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--tx3);display:flex;justify-content:space-between}
+.doc-card .d-no{font-family:var(--mono);font-size:13px;color:var(--blue);margin:6px 0 10px;letter-spacing:.02em}
+.doc-card .d-row{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.doc-card .d-row:last-child{border-bottom:none}
+.doc-card .d-row span{color:var(--tx2)}
+.doc-card .d-row b{font-family:var(--mono);color:var(--tx0);font-weight:500}
+
+/* ============================================================
+   角色权限页
+   ============================================================ */
+.rbac-grid{display:grid;grid-template-columns:1.55fr 1fr;gap:22px}
+.matrix-wrap{overflow-x:auto}
+.matrix{border-collapse:collapse;width:100%;min-width:820px}
+.matrix th,.matrix td{border:1px solid var(--line);padding:0;text-align:center}
+.matrix thead th{padding:9px 6px;font-family:var(--mono);font-size:10px;color:var(--tx2);letter-spacing:.06em;background:var(--bg2);font-weight:500;position:sticky;top:0;z-index:2}
+.matrix thead th.rot{writing-mode:vertical-lr;transform:rotate(180deg);height:74px;letter-spacing:.18em;font-size:10px}
+.matrix tbody th{
+  padding:10px 12px;text-align:left;font-family:var(--mono);font-size:11px;color:var(--tx0);
+  background:var(--bg2);font-weight:500;white-space:nowrap;
+}
+.matrix tbody th .r-name{display:block;font-size:11px}
+.matrix tbody th .r-key{display:block;font-size:9px;color:var(--tx3);letter-spacing:.06em;margin-top:2px}
+.matrix td.cell{width:44px;height:34px;position:relative;cursor:pointer;transition:background .15s}
+.matrix td.cell:hover{background:var(--bg3)}
+.matrix .filled{background:rgba(255,178,36,.16);box-shadow:inset 0 0 0 1px rgba(255,178,36,.35)}
+.matrix .filled::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%) rotate(45deg);background:var(--amber)}
+.matrix .empty{background:rgba(127,140,155,.04)}
+.matrix .empty::after{content:"";position:absolute;left:50%;top:50%;width:2px;height:2px;transform:translate(-50%,-50%) rotate(45deg);background:var(--tx3);opacity:.55}
+
+.rule-list{display:flex;flex-direction:column}
+.rule-row{display:flex;gap:14px;padding:12px 4px;border-bottom:1px dashed var(--line);font-size:12px}
+.rule-row:last-child{border-bottom:none}
+.rule-row .r-idx{font-family:var(--mono);font-size:10px;color:var(--amber);flex:none;width:24px;padding-top:1px}
+.rule-row .r-txt{color:var(--tx1);flex:1}
+.rule-row .r-txt b{color:var(--tx0);font-weight:600}
+.rule-row .r-tag{flex:none;font-family:var(--mono);font-size:9.5px;padding:1px 7px;border-radius:7px;align-self:center}
+
+/* ============================================================
+   工具台页
+   ============================================================ */
+.tool-cols{columns:2;column-gap:18px}
+.tool-mod{break-inside:avoid;margin-bottom:18px}
+.tool-mod-hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tool-mod-hd .m-seq{font-family:var(--mono);font-size:10px;color:var(--amber);letter-spacing:.1em}
+.tool-mod-hd .m-name{font-size:13px;font-weight:600}
+.tool-mod-hd .m-count{font-family:var(--mono);font-size:10px;color:var(--tx2);margin-left:auto}
+.tool-item{padding:13px 15px;margin-bottom:9px}
+.tool-item .t-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.tool-item .t-name{font-family:var(--mono);font-size:13px;color:var(--blue);font-weight:600}
+.tool-item .t-write{font-family:var(--mono);font-size:9px;color:var(--amber);border:1px solid rgba(255,178,36,.4);border-radius:7px;padding:0 6px}
+.tool-item .t-ro{font-family:var(--mono);font-size:9px;color:var(--green);border:1px solid rgba(62,197,154,.4);border-radius:7px;padding:0 6px}
+.tool-item .t-desc{font-size:11.5px;color:var(--tx1);margin-bottom:9px}
+.tool-item .t-args{font-family:var(--mono);font-size:10.5px;color:var(--tx2);background:var(--bg0);border:1px solid var(--line);border-radius:3px;padding:8px 10px;line-height:1.85}
+.tool-item .t-args b{color:var(--tx1);font-weight:500}
+.tool-item .t-roles{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tool-item .t-roles span{font-family:var(--mono);font-size:9.5px;color:var(--tx2);border:1px solid var(--line2);padding:1px 7px;border-radius:2px}
+
+/* ============================================================
+   系统指标页
+   ============================================================ */
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.metric{padding:14px 16px}
+.metric .m-label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--tx2);text-transform:uppercase;display:flex;justify-content:space-between}
+.metric .m-label .u{color:var(--tx3)}
+.metric .m-value{font-family:var(--mono);font-size:26px;font-weight:600;margin-top:7px;line-height:1}
+.metric .m-note{font-size:11px;color:var(--tx3);margin-top:7px}
+.hist-wrap{padding:20px 22px;margin-bottom:22px}
+.hist{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:12px}
+.hist .h-bar{
+  flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;height:100%;
+  text-align:center;min-width:0;
+}
+.hist .h-col{background:linear-gradient(180deg,rgba(77,163,255,.85),rgba(77,163,255,.28));border-radius:2px 2px 0 0;position:relative;transition:height .6s cubic-bezier(.2,.7,.3,1)}
+.hist .h-col:hover{background:linear-gradient(180deg,rgba(255,178,36,.9),rgba(255,178,36,.3))}
+.hist .h-col .h-val{position:absolute;top:-19px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:9.5px;color:var(--tx2)}
+.hist .h-tick{font-family:var(--mono);font-size:9.5px;color:var(--tx3);white-space:nowrap}
+.trace-panel{padding:20px 22px;margin-bottom:22px}
+.trace-table{width:100%;border-collapse:collapse;margin-top:12px}
+.trace-table th{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;color:var(--tx3);text-align:left;padding:7px 10px;border-bottom:1px solid var(--line2);text-transform:uppercase;font-weight:500}
+.trace-table td{font-family:var(--mono);font-size:11.5px;padding:9px 10px;border-bottom:1px solid var(--line);color:var(--tx1)}
+.trace-table td:first-child{color:var(--blue)}
+.trace-table .lamp{width:6px;height:6px}
+
+/* ============================================================
+   连接设置模态
+   ============================================================ */
+.modal{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s}
+.modal.show{opacity:1;pointer-events:auto}
+.modal-card{width:520px;max-width:calc(100vw - 40px);background:var(--bg1);border:1px solid var(--line2);border-radius:5px;box-shadow:var(--shadow);transform:translateY(14px);transition:transform .26s cubic-bezier(.2,.7,.3,1)}
+.modal.show .modal-card{transform:none}
+.modal-hd{display:flex;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.modal-hd h3{font-size:14px;font-weight:600;letter-spacing:.05em}
+.modal-hd .close{margin-left:auto;cursor:pointer;color:var(--tx2);font-size:18px;line-height:1;background:none;border:none;padding:4px}
+.modal-hd .close:hover{color:var(--tx0)}
+.modal-bd{padding:20px}
+.f-field{margin-bottom:15px}
+.f-field label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--tx2);margin-bottom:7px;text-transform:uppercase}
+.f-field input[type=text],.f-field select{
+  width:100%;background:var(--bg0);border:1px solid var(--line2);border-radius:3px;
+  color:var(--tx0);font-family:var(--mono);font-size:12.5px;padding:9px 11px;outline:none;
+  transition:border-color .2s;
+}
+.f-field input:focus,.f-field select:focus{border-color:var(--amber)}
+.f-field select{cursor:pointer}
+.f-field .hint{font-size:11px;color:var(--tx3);margin-top:6px;line-height:1.6}
+.role-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:200px;overflow-y:auto;margin-top:4px}
+.role-opt{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);
+  border-radius:3px;cursor:pointer;font-size:12px;color:var(--tx1);
+  transition:border-color .15s,background .15s;
+}
+.role-opt:hover{border-color:var(--line3)}
+.role-opt.sel{border-color:rgba(255,178,36,.55);background:rgba(255,178,36,.07);color:var(--tx0)}
+.role-opt .r-r{font-family:var(--mono);font-size:10px;color:var(--amber);flex:none}
+.role-opt .r-k{font-family:var(--mono);font-size:9.5px;color:var(--tx3);margin-left:auto}
+.modal-ft{display:flex;justify-content:flex-end;gap:10px;padding:15px 20px;border-top:1px solid var(--line)}
+
+/* 提示条 */
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg3);border:1px solid var(--line2);border-radius:4px;
+  padding:11px 18px;font-size:12.5px;color:var(--tx0);z-index:90;
+  display:flex;align-items:center;gap:10px;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;box-shadow:var(--shadow);font-family:var(--mono);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .lamp{width:7px;height:7px}
+
+/* 响应式 */
+@media (max-width:1500px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.expert-grid{grid-template-columns:repeat(2,1fr)}.tool-cols{columns:1}}
+@media (max-width:1180px){
+  .approval-layout{grid-template-columns:1fr}
+  .rbac-grid{grid-template-columns:1fr}
+  .overview-grid{grid-template-columns:1fr}
+  .doc-grid{grid-template-columns:repeat(2,1fr)}
+  .metric-grid{grid-template-columns:repeat(2,1fr)}
+  .flow-track{flex-direction:column}
+  .flow-conn{width:100%;height:26px}
+  .flow-conn::before{width:1px;height:100%}
+  .flow-conn::after{transform:rotate(135deg);top:auto;bottom:-2px;right:auto;left:50%}
+}
+@media (max-width:820px){
+  .nav{width:58px}
+  .nav-item span.txt,.nav-label,.nav-item .idx,.nav-item .badge{display:none}
+  .nav-item{justify-content:center;padding:10px}
+  .nav-item.active::before{display:none}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .expert-grid{grid-template-columns:1fr}
+  .doc-grid{grid-template-columns:1fr}
+  .metric-grid{grid-template-columns:1fr}
+  .main{padding:18px 16px 50px}
+  .topbar .meta span.hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ======================= 顶栏 ======================= -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 4h18M3 4l3 16h12l3-16M8 9l2.5 7M16 9l-2.5 7M12 9v7"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">MIIRP<em>·</em>控制台</div>
+      <div class="brand-sub">物料入库智能审查平台</div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="service-state" id="svc-state">
+    <span class="lamp off" id="svc-lamp"></span>
+    <span class="state-txt" id="svc-txt">未连接</span>
+    <span class="db-txt" id="svc-db"></span>
+  </div>
+  <div class="grow"></div>
+  <div class="meta">
+    <span class="hide-sm">审批阈值 <b class="mono" style="color:var(--amber)">¥100,000</b></span>
+    <span class="hide-sm">超时 <b>120s</b></span>
+    <span class="ver-tag">v3.1.0</span>
+    <button class="btn primary" id="btn-conn">后端连接</button>
+  </div>
+</header>
+
+<!-- ======================= 外壳 ======================= -->
+<div class="shell">
+  <!-- 侧栏导航 -->
+  <nav class="nav">
+    <div class="nav-label">控制面板</div>
+    <div class="nav-item active" data-view="overview">
+      <span class="idx">01</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="txt">系统总览</span>
+    </div>
+    <div class="nav-item" data-view="approvals">
+      <span class="idx">02</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 8v3M12 13v3M12 18v3"/><circle cx="12" cy="5.5" r="1.6"/><circle cx="12" cy="11" r="1.6"/><circle cx="12" cy="16.5" r="1.6"/></svg>
+      <span class="txt">审批中心</span>
+      <span class="badge" id="nav-badge" hidden>0</span>
+    </div>
+    <div class="nav-item" data-view="pipeline">
+      <span class="idx">03</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4"/></svg>
+      <span class="txt">业务链路</span>
+    </div>
+    <div class="nav-item" data-view="rbac">
+      <span class="idx">04</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M8 9V7a4 4 0 0 1 8 0v2"/><circle cx="12" cy="14.5" r="1.8"/></svg>
+      <span class="txt">角色权限</span>
+    </div>
+    <div class="nav-item" data-view="toolkit">
+      <span class="idx">05</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4.5 4.5 0 0 0-6 6L3 18l3 3 5.7-5.7a4.5 4.5 0 0 0 6-6L14 13l-3-3 3.7-3.7z"/></svg>
+      <span class="txt">工具台</span>
+    </div>
+    <div class="nav-item" data-view="metrics">
+      <span class="idx">06</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 6-9"/><path d="M14 5h4v4"/></svg>
+      <span class="txt">系统指标</span>
+    </div>
+    <div class="nav-foot">
+      <div>CHAIN: AUTH → RATE → AUDIT → APPROVAL</div>
+      <div class="dim">MCP · 9 MODULES · 16 TOOLS</div>
+    </div>
+  </nav>
+
+  <!-- 主区 -->
+  <main class="main" id="main">
+    <!-- ============ 01 系统总览 ============ -->
+    <section class="view active" id="view-overview">
+      <div class="view-head">
+        <div class="kicker">System Overview</div>
+        <h2 class="title">系统总览</h2>
+        <p class="sub">物料入库智能审查平台控制台。围绕 采购订单 → 收货 → 质检 → 入库 的业务链路，聚合 9 个工具模块、16 个 MCP 工具、11 个角色与审批闭环的运行状态。</p>
+      </div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="panel flow-band">
+        <div class="panel-hd">
+          <span class="tag">FLOW</span><h3>业务链路 · 采购订单 → 入库过账</h3>
+          <span class="chip amber" style="margin-left:auto">审批拦截: create_inbound_record</span>
+        </div>
+        <div class="flow-track" id="flow-track"></div>
+      </div>
+      <div class="overview-grid">
+        <div class="panel">
+          <div class="panel-hd"><span class="tag">GOVERNANCE</span><h3>治理中间件链</h3></div>
+          <div class="panel-bd gov-list" id="gov-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-hd"><span class="tag">AUDIT</span><h3>最近调用活动</h3><span class="chip" style="margin-left:auto">演示数据</span></div>
+          <div class="panel-bd act-list" id="act-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 02 审批中心 ============ -->
+    <section class="view" id="view-approvals">
+      <div class="view-head">
+        <div class="kicker">Approval Center</div>
+        <h2 class="title">审批中心</h2>
+        <p class="sub">写工具 <b class="mono" style="color:var(--amber)">create_inbound_record</b> 经 ApprovalMiddleware 统一建单拦截；金额 ≥ ¥100,000 触发双人审批，任一拒签整体驳回，超时 120s 置 expired。数据源：<span class="mono" style="color:var(--blue)">GET /approvals</span>（需 X-MIIRP-Key）。</p>
+      </div>
+      <div class="approval-layout">
+        <div class="panel">
+          <div class="panel-hd">
+            <span class="tag">QUEUE</span><h3>审批待办</h3>
+            <span class="chip amber" id="queue-count" style="margin-left:auto">PENDING 0</span>
+            <button class="btn ghost" id="btn-refresh-appr">↻ 刷新</button>
+          </div>
+          <div class="panel-bd" style="padding:0">
+            <table class="approval-table">
+              <thead><tr>
+                <th>审批单号</th><th>触发工具</th><th>提议人</th><th>金额 (CNY)</th><th>模式</th><th>状态</th><th>提交时间</th>
+              </tr></thead>
+              <tbody id="approval-tbody"></tbody>
+            </table>
+            <div class="empty-tip" id="approval-empty" hidden>
+              <div>暂无待办审批</div>
+              <div class="mono">approval_requests.status = 'pending' → 0 条</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel fsm-panel">
+          <div class="panel-hd"><span class="tag">FSM</span><h3>审批状态机</h3></div>
+          <div class="panel-bd">
+            <div class="fsm-track" id="fsm-track"></div>
+            <div class="fsm-note">终态幂等 · 双人审批第二签须异人 · 任一拒绝 → rejected</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 业务链路 ============ -->
+    <section class="view" id="view-pipeline">
+      <div class="view-head">
+        <div class="kicker">Inbound Pipeline</div>
+        <h2 class="title">业务链路 · 双路径审查演示</h2>
+        <p class="sub">四路专家（数量/价格/供应商/追溯）并行审查，合规复核输出决策；PASS / FAIL 双路径对应种子数据锚点 GRN-20260820-011 / 012。</p>
+      </div>
+      <div class="path-tabs" id="path-tabs">
+        <div class="path-tab active" data-path="pass"><span class="lamp green"></span>PASS 路径 · GRN-20260820-011</div>
+        <div class="path-tab" data-path="fail"><span class="lamp red"></span>FAIL 路径 · GRN-20260820-012</div>
+      </div>
+      <div class="expert-grid" id="expert-grid"></div>
+      <div class="panel decision-band" id="decision-band"></div>
+      <div class="doc-grid" id="doc-grid"></div>
+    </section>
+
+    <!-- ============ 04 角色权限 ============ -->
+    <section class="view" id="view-rbac">
+      <div class="view-head">
+        <div class="kicker">RBAC Matrix</div>
+        <h2 class="title">角色 · 工具白名单矩阵</h2>
+        <p class="sub">白名单同时作用于 <b class="mono" style="color:var(--amber)">tools/list</b> 可见性裁剪与 <b class="mono" style="color:var(--amber)">tools/call</b> 强制校验，构成双重拦截；行可点击查看该角色的可用工具。</p>
+      </div>
+      <div class="rbac-grid">
+        <div class="panel">
+          <div class="panel-hd"><span class="tag">MATRIX</span><h3>11 角色 × 16 工具</h3><span class="chip blue" style="margin-left:auto" id="rbac-hint">悬停查看</span></div>
+          <div class="panel-bd matrix-wrap"><table class="matrix" id="rbac-matrix"></table></div>
+        </div>
+        <div>
+          <div class="panel" style="margin-bottom:22px">
+            <div class="panel-hd"><span class="tag">RULES</span><h3>审批治理规则</h3></div>
+            <div class="panel-bd rule-list" id="rule-list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-hd"><span class="tag">IDENTITY</span><h3>本地身份密钥表</h3><span class="chip" style="margin-left:auto">X-MIIRP-Key</span></div>
+            <div class="panel-bd" style="padding:0;overflow-x:auto">
+              <table class="trace-table">
+                <thead><tr><th>角色</th><th>client_id</th><th>API Key</th></tr></thead>
+                <tbody id="key-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 05 工具台 ============ -->
+    <section class="view" id="view-toolkit">
+      <div class="view-head">
+        <div class="kicker">Tool Registry</div>
+        <h2 class="title">工具台 · 9 模块 16 工具</h2>
+        <p class="sub">全部工具统一 <span class="mono" style="color:var(--amber)">register(mcp)</span> 注册；签名与角色白名单以 <span class="mono" style="color:var(--blue)">api_contract.md v1.2</span> 为唯一事实源。</p>
+      </div>
+      <div class="tool-cols" id="tool-cols"></div>
+    </section>
+
+    <!-- ============ 06 系统指标 ============ -->
+    <section class="view" id="view-metrics">
+      <div class="view-head">
+        <div class="kicker">Observability</div>
+        <h2 class="title">系统指标</h2>
+        <p class="sub">固定窗口直方图指标，Prometheus 文本格式输出于 <span class="mono" style="color:var(--blue)">GET /metrics</span>；下方为当前会话的调用统计。</p>
+      </div>
+      <div class="metric-grid" id="metric-grid"></div>
+      <div class="panel hist-wrap">
+        <div class="panel-hd"><span class="tag">LATENCY</span><h3>调用延迟分布 · 直方图 (ms)</h3></div>
+        <div class="hist" id="hist"></div>
+      </div>
+      <div class="panel trace-panel">
+        <div class="panel-hd"><span class="tag">TRACE</span><h3>工具调用明细</h3><span class="chip" id="trace-src" style="margin-left:auto">演示数据</span></div>
+        <table class="trace-table">
+          <thead><tr><th>时间</th><th>工具</th><th>调用方</th><th>状态</th><th>延迟</th><th>correlation_id</th></tr></thead>
+          <tbody id="metric-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ======================= 审批详情抽屉 ======================= -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-hd">
+    <span class="lamp amber"></span>
+    <h3 id="drawer-title">审批单详情</h3>
+    <button class="close btn ghost" id="drawer-close" style="margin-left:auto;padding:4px 8px">✕</button>
+  </div>
+  <div class="drawer-bd" id="drawer-bd"></div>
+  <div class="drawer-ft" id="drawer-ft">
+    <button class="btn danger" id="btn-drawer-reject">驳回</button>
+    <button class="btn ok" id="btn-drawer-approve">批准</button>
+  </div>
+</aside>
+
+<!-- ======================= 连接设置模态 ======================= -->
+<div class="modal" id="conn-modal">
+  <div class="modal-card">
+    <div class="modal-hd">
+      <h3>后端连接配置</h3>
+      <button class="close" id="conn-close">✕</button>
+    </div>
+    <div class="modal-bd">
+      <div class="f-field">
+        <label>服务地址</label>
+        <input type="text" id="conn-url" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
+        <div class="hint">MIIRP streamable-http 服务基地址；前端需与后端同源（经 nginx 托管）或后端放行 CORS。未配置时自动进入离线演示模式。</div>
+      </div>
+      <div class="f-field">
+        <label>调用身份 · 选择角色</label>
+        <div class="role-grid" id="role-grid"></div>
+        <div class="hint">对应 <span class="mono">X-MIIRP-Key</span> 请求头；审批待办仅 warehouse-manager / compliance-officer 可查。</div>
+      </div>
+      <div class="f-field">
+        <label>连接状态</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="lamp off" id="conn-lamp"></span>
+          <span class="mono" style="font-size:12px;color:var(--tx1)" id="conn-status">未检测</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn ghost" id="btn-test-conn">检测连通</button>
+      <button class="btn" id="btn-demo">离线演示</button>
+      <button class="btn primary" id="btn-save-conn">保存连接</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="lamp" id="toast-lamp"></span><span id="toast-txt"></span></div>
+
+<script id="app-js">
+'use strict';
+/* ============================================================
+   1. 契约数据（事实源：api_contract.md v1.2 / config/default.yaml）
+   ============================================================ */
+const TOOL_MODULES = [
+  { seq:'01', mod:'po_tools',       area:'订单域',  tools:[
+    { name:'get_po',  write:false, roles:['grn-operator','qty-check-agent'],
+      args:'po_no: str（采购订单号）', ret:'OrderService.get(po_no)：{po_no, pr_no, sku, quantity, unit_price, currency, supplier_id, status}' },
+    { name:'create_po', write:true, roles:[],
+      args:'pr_no: str, sku: str, quantity: int, unit_price: float, currency: str, supplier_id: str',
+      ret:'生成 PO-{uuid8}，status="open"' },
+  ]},
+  { seq:'02', mod:'grn_tools',      area:'收货域',  tools:[
+    { name:'get_grn',  write:false, roles:['iqc-inspector','qty-check-agent'],
+      args:'grn_no: str（收货单号）', ret:'GrnService.get(grn_no)：{grn_no, po_no, sku, received_qty, batch_no, carrier, received_at}' },
+    { name:'create_grn', write:true, roles:['grn-operator'],
+      args:'po_no: str, sku: str, received_qty: int, batch_no: str, carrier: str',
+      ret:'生成 GRN-{uuid10}，received_at 由服务写入' },
+  ]},
+  { seq:'03', mod:'iqc_tools',      area:'质检域',  tools:[
+    { name:'get_iqc',  write:false, roles:[],
+      args:'iqc_no: str（质检报告号）', ret:'IqcService.get(iqc_no)：报告字段' },
+    { name:'create_iqc_report', write:true, roles:['iqc-inspector'],
+      args:'grn_no: str, sku: str, sample_qty: int, defect_qty: int',
+      ret:'verdict = "pass" if defect_qty == 0 else "fail"；生成 IQC-{uuid10}' },
+  ]},
+  { seq:'04', mod:'inventory_tools',area:'库存域',  tools:[
+    { name:'get_inventory', write:false, roles:['warehouse-manager','buyer','inventory-agent'],
+      args:'sku: str（物料编码）', ret:'{sku, stock_qty, safety_stock, reorder_point, avg_daily_usage, last_90d_usage}；无记录返回全 0 台账' },
+    { name:'list_low_stock_materials', write:false, roles:['warehouse-manager','inventory-agent'],
+      args:'无', ret:'list[dict]：stock_qty < safety_stock 的物料台账列表' },
+    { name:'get_stock_usage', write:false, roles:['inventory-agent'],
+      args:'sku: str, days: int = 90', ret:'{sku, days, avg_daily_usage, total_usage}' },
+  ]},
+  { seq:'05', mod:'supplier_tools', area:'供应商域', tools:[
+    { name:'get_supplier_profile', write:false, roles:['compliance-officer','supplier-check-agent'],
+      args:'supplier_id: str', ret:'{supplier_id, name, region, qualification_expiry, risk_level, ontime_rate, pass_rate}；无记录返回 {}' },
+    { name:'get_supplier_quote', write:false, roles:['buyer','price-check-agent'],
+      args:'supplier_id: str, sku: str', ret:'{supplier_id, sku, latest_price, currency, p90_min, p90_max}；无记录返回 {}' },
+  ]},
+  { seq:'06', mod:'trace_tools',    area:'追溯域',  tools:[
+    { name:'get_trace_batch', write:false, roles:['compliance-officer','trace-check-agent'],
+      args:'batch_no: str（收货批次号）', ret:'{batch_no, supplier_batch, production_date, material_lot, trace_complete}；追溯链断裂时 supplier_batch 为空、trace_complete=False' },
+  ]},
+  { seq:'07', mod:'inbound_tools',  area:'入库域·唯一写审批工具', tools:[
+    { name:'create_inbound_record', write:true, roles:['warehouse-manager','compliance-officer','review-agent'],
+      args:'grn_no: str, iqc_no: str, sku: str, quantity: int, unit_price: float, currency: str, supplier_id: str',
+      ret:'{in_no, grn_no, iqc_no, sku, inbound_qty, unit_price, currency, supplier_id, approval_request_id, status, reviewed_by}；审批通过后经 ctx 注入 approval_request_id，同一审批单重复执行幂等' },
+  ]},
+  { seq:'08', mod:'approval_tools', area:'审批接入面', tools:[
+    { name:'approve_inbound_request', write:true, roles:['warehouse-manager','compliance-officer'],
+      args:'request_id: str, approved: bool, reason: str = ""', ret:'{id, status, idempotent?}；审批人身份读 ctx state miirp_client_id，高价值单据须双人异人两签' },
+    { name:'list_pending_approvals', write:false, roles:['warehouse-manager','compliance-officer'],
+      args:'无', ret:'list[dict]：{id, tool_name, proposer, status, amount_cny, double_review, correlation_id, created_at}' },
+  ]},
+  { seq:'09', mod:'notify_tools',   area:'通知域',  tools:[
+    { name:'notify', write:true, roles:['warehouse-manager','buyer','compliance-officer','review-agent','inventory-agent'],
+      args:'channel: str (internal/email/im), receiver: str, title: str, body: str',
+      ret:'{message_id, channel, receiver, title, status="sent"}' },
+  ]},
+];
+
+const ROLE_KEYS = [
+  { role:'grn-operator',        client:'grn-001',    key:'key-grn-001' },
+  { role:'iqc-inspector',       client:'iqc-001',    key:'key-iqc-001' },
+  { role:'warehouse-manager',   client:'wh-001',     key:'key-wh-001' },
+  { role:'buyer',               client:'buyer-001',  key:'key-buyer-001' },
+  { role:'compliance-officer',  client:'comp-001',   key:'key-comp-001' },
+  { role:'qty-check-agent',     client:'qty-001',    key:'key-qty-001' },
+  { role:'price-check-agent',   client:'price-001',  key:'key-price-001' },
+  { role:'supplier-check-agent',client:'sup-001',    key:'key-sup-001' },
+  { role:'trace-check-agent',   client:'trace-001',  key:'key-trace-001' },
+  { role:'review-agent',        client:'review-001', key:'key-review-001' },
+  { role:'inventory-agent',     client:'inv-001',    key:'key-inv-001' },
+];
+const ALL_TOOLS = TOOL_MODULES.flatMap(m => m.tools.map(t => ({...t, mod:m.mod})));
+const ALL_TOOL_NAMES = ALL_TOOLS.map(t => t.name);
+const roleTools = role => (ROLE_KEYS.find(r => r.role === role) || {});
+const toolsOfRole = role => ALL_TOOLS.filter(t => t.roles.includes(role)).map(t => t.name);
+
+const RULES = [
+  { tag:'P0-1', cls:'amber', txt:'<b>双重拦截</b>：白名单同时作用于 tools/list 可见性裁剪与 tools/call 强制校验，任一阶段未通过即拒绝，强制校验为越权防护最终闸门。' },
+  { tag:'P0-2', cls:'amber', txt:'<b>审批人角色校验</b>：decide 落库前校验审批人 client_id 所属角色 ∈ {warehouse-manager, compliance-officer}，未授权抛 PermissionDeniedError。' },
+  { tag:'P0-3', cls:'amber', txt:'<b>双人异人校验</b>：double_review=1 单据第二签须与第一签为不同审批人，同一审批人连续两签直接拒绝。' },
+  { tag:'', cls:'blue', txt:'<b>高价值阈值</b>：amount_cny = unit_price × quantity ≥ ¥100,000 触发双人审批（double_review=1）。' },
+  { tag:'', cls:'blue', txt:'<b>超时语义</b>：wait_for_decision 短轮询 0.5s，超时 120s 置 expired；终态幂等不可再改。' },
+  { tag:'D1', cls:'green', txt:'<b>唯一入口</b>：审批单只能由 ApprovalMiddleware 创建，工具/服务不得自行建单。' },
+  { tag:'D6', cls:'green', txt:'<b>否决语义</b>：双人审批任一审批人拒绝 → 整体 rejected（先校验拒绝、再校验异人）。' },
+  { tag:'B', cls:'violet', txt:'<b>幂等注入</b>：审批通过后 miirp_approval_request_id 写入 context state，入库单强关联且重复执行幂等。' },
+];
+
+/* ============================================================
+   2. 演示数据（离线模式；业务锚点取自 seed.py 种子数据）
+   ============================================================ */
+const DEMO = {
+  approvals: [
+    { id:'d4c2a1f09e77', tool_name:'create_inbound_record', proposer:'review-agent', status:'pending',
+      amount_cny:45600, double_review:0, correlation_id:'7f2e9a1b-c4d5-4e6f-9a8b-1c2d3e4f5a6b', created_at:'2026-08-21T09:12:44',
+      payload:{ grn_no:'GRN-20260820-011', iqc_no:'IQC-20260820-011', sku:'M-1001', quantity:120, unit_price:380.0, currency:'CNY', supplier_id:'SUP-02' } },
+    { id:'b08d31cc52f4', tool_name:'create_inbound_record', proposer:'warehouse-manager', status:'pending',
+      amount_cny:158000, double_review:1, correlation_id:'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', created_at:'2026-08-21T08:47:19',
+      reviewers:['comp-001'], payload:{ grn_no:'GRN-20260821-003', iqc_no:'IQC-20260821-003', sku:'M-2002', quantity:800, unit_price:197.5, currency:'CNY', supplier_id:'SUP-04' } },
+    { id:'e67a90d2b3c5', tool_name:'create_inbound_record', proposer:'compliance-officer', status:'pending',
+      amount_cny:236500, double_review:1, correlation_id:'9f8e7d6c-5b4a-4c3d-2e1f-0a9b8c7d6e5f', created_at:'2026-08-21T07:58:02',
+      payload:{ grn_no:'GRN-20260820-015', iqc_no:'IQC-20260820-015', sku:'M-3003', quantity:550, unit_price:430.0, currency:'CNY', supplier_id:'SUP-06' } },
+    { id:'a51f83e204d9', tool_name:'create_inbound_record', proposer:'review-agent', status:'pending',
+      amount_cny:23400, double_review:0, correlation_id:'11223344-5566-4a77-8899-aabbccddeeff', created_at:'2026-08-20T17:35:41',
+      payload:{ grn_no:'GRN-20260820-009', iqc_no:'IQC-20260820-009', sku:'M-4004', quantity:180, unit_price:130.0, currency:'CNY', supplier_id:'SUP-03' } },
+  ],
+  activities: [
+    { time:'09:12:44', tool:'create_inbound_record', role:'review-agent', msg:'审批单 d4c2a1f09e77 待决 · ¥45,600', st:'pending', cls:'amber' },
+    { time:'09:02:11', tool:'approve_inbound_request', role:'comp-001', msg:'审批单 8c9d0e1f… 已批准 · 入库过账', st:'ok', cls:'green' },
+    { time:'08:58:30', tool:'get_inventory', role:'wh-001', msg:'M-1001 库存 480 < 安全库存 1,000 · 触发低库存预警', st:'ok', cls:'blue' },
+    { time:'08:55:02', tool:'create_iqc_report', role:'iqc-001', msg:'IQC-20260820-012 verdict=fail · 拒收路径', st:'err', cls:'red' },
+    { time:'08:41:19', tool:'get_trace_batch', role:'comp-001', msg:'B20260820012 追溯链断裂 · trace_complete=false', st:'ok', cls:'blue' },
+    { time:'08:33:57', tool:'create_grn', role:'grn-001', msg:'GRN-20260820-012 实收 54,000（超收 8%）', st:'ok', cls:'blue' },
+  ],
+  pipeline: {
+    pass: {
+      label:'PASS · GRN-20260820-011', decision:'approve', decisionZh:'批准入库',
+      correlation:'corr-9c2f5a81-04d7',
+      experts:[
+        { name:'数量专家', role:'qty-check-agent', risk:'low', reason:'实收 50,000 与订单数量完全一致，未触发超收容差（≤5%）。', data:'PO 50,000 / GRN 50,000 / Δ 0%' },
+        { name:'价格专家', role:'price-check-agent', risk:'low', reason:'单价 ¥1.90 位于该供应商 P90 价格区间内，无明显偏离。', data:'P90 [1.75, 2.05] / 实际 1.90' },
+        { name:'供应商专家', role:'supplier-check-agent', risk:'low', reason:'SUP-02 资质有效，准时率 96% ≥ 80%，合格率 98% ≥ 95%，双指标达标。', data:'on-time 96% / pass-rate 98% / risk low' },
+        { name:'追溯专家', role:'trace-check-agent', risk:'low', reason:'批次 B20260820011 追溯链完整，supplier_batch 已回填。', data:'trace_complete=true / lot B20260820011' },
+      ],
+      riskMap:{ 数量:'low', 价格:'low', 供应商:'low', 追溯:'low' },
+      docs:[
+        { type:'PO', no:'PO-20260818001', rows:[['pr_no','PR-20260812003'],['sku','M-1001'],['quantity','50,000'],['unit_price','¥1.90'],['supplier','SUP-02'],['status','open']] },
+        { type:'GRN', no:'GRN-20260820-011', rows:[['po_no','PO-20260818001'],['received_qty','50,000'],['batch_no','B20260820011'],['carrier','顺丰速运'],['received_at','08-20 10:24']] },
+        { type:'IQC', no:'IQC-20260820-011', rows:[['grn_no','GRN-20260820-011'],['sample_qty','320'],['defect_qty','0'],['verdict','pass'],['sku','M-1001']] },
+        { type:'IN', no:'IN-20260821001', rows:[['inbound_qty','50,000'],['approval','d4c2a1f0… 已过'],['status','approved'],['reviewed_by','wh-001'],['sku','M-1001']] },
+      ],
+      inventory:{ alert:true, sku:'M-1001', stock:480, safety:1000, avg:120, suggested:1400, reason:'avg_daily_usage×7 + (safety−stock) = 1,360 → 取整 1,400' },
+    },
+    fail: {
+      label:'FAIL · GRN-20260820-012', decision:'reject', decisionZh:'拒绝入库',
+      correlation:'corr-6d1e8f2c-91b3',
+      experts:[
+        { name:'数量专家', role:'qty-check-agent', risk:'high', reason:'实收 54,000 超出订单 50,000 达 8%，超过 5% 容差上限，超收风险。', data:'PO 50,000 / GRN 54,000 / Δ +8%' },
+        { name:'价格专家', role:'price-check-agent', risk:'high', reason:'单价 ¥3.30 高于 P90 上限 ¥2.05，偏离 61%，疑似价格虚高。', data:'P90 [1.75, 2.05] / 实际 3.30' },
+        { name:'供应商专家', role:'supplier-check-agent', risk:'high', reason:'SUP-01 资质临近到期，准时率 71% < 80% 阈值，合格率 92% < 95%。', data:'on-time 71% / pass-rate 92% / risk high' },
+        { name:'追溯专家', role:'trace-check-agent', risk:'high', reason:'批次 B20260820012 追溯链断裂，supplier_batch 缺失，来源不可溯。', data:'trace_complete=false / lot B20260820012' },
+      ],
+      riskMap:{ 数量:'high', 价格:'high', 供应商:'high', 追溯:'high' },
+      docs:[
+        { type:'PO', no:'PO-20260818001', rows:[['pr_no','PR-20260812003'],['sku','M-1001'],['quantity','50,000'],['unit_price','¥3.30'],['supplier','SUP-01'],['status','open']] },
+        { type:'GRN', no:'GRN-20260820-012', rows:[['po_no','PO-20260818001'],['received_qty','54,000'],['batch_no','B20260820012'],['carrier','中通快运'],['received_at','08-20 11:05']] },
+        { type:'IQC', no:'IQC-20260820-012', rows:[['grn_no','GRN-20260820-012'],['sample_qty','320'],['defect_qty','18'],['verdict','fail'],['sku','M-1001']] },
+        { type:'IN', no:'—', rows:[['inbound_qty','— 未过账'],['approval','—'],['status','rejected'],['reviewed_by','comp-001'],['原因','合规复核拒收']] },
+      ],
+      inventory:{ alert:true, sku:'M-1001', stock:480, safety:1000, avg:120, suggested:1400, reason:'同上，独立于该路径的库存预警' },
+    },
+  },
+  traces: [
+    { t:'09:12:44', tool:'create_inbound_record', who:'review-001', st:'pending',  ms:'—',   corr:'7f2e9a1b-c4d5-4e6f-9a8b-1c2d3e4f5a6b', cls:'amber' },
+    { t:'09:02:11', tool:'approve_inbound_request', who:'comp-001', st:'ok',       ms:'42',  corr:'8c9d0e1f-2a3b-4c5d-6e7f-8091a2b3c4d5', cls:'green' },
+    { t:'08:58:30', tool:'get_inventory', who:'wh-001', st:'ok',     ms:'18',  corr:'5f4e3d2c-1b0a-9f8e-7d6c-5b4a39281706', cls:'green' },
+    { t:'08:55:02', tool:'create_iqc_report', who:'iqc-001', st:'err',    ms:'24',  corr:'1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d', cls:'red' },
+    { t:'08:41:19', tool:'get_trace_batch', who:'comp-001', st:'ok',     ms:'12',  corr:'0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b', cls:'green' },
+    { t:'08:33:57', tool:'create_grn', who:'grn-001', st:'ok',     ms:'31',  corr:'a9b8c7d6-5e4f-4a3b-2c1d-0e9f8a7b6c5d', cls:'green' },
+    { t:'08:21:40', tool:'get_po', who:'qty-001', st:'ok',        ms:'9',   corr:'6f5e4d3c-2b1a-4c9d-8e7f-0615243342b1', cls:'green' },
+    { t:'08:09:15', tool:'get_supplier_quote', who:'buyer-001', st:'ok', ms:'15', corr:'8a7b6c5d-4e3f-4a2b-1c0d-9e8f7a6b5c4d', cls:'green' },
+  ],
+  hist:[5,10,25,50,100,250,500,1000,2500].map((b,i)=>[b, [212,184,153,96,58,17,6,2,1][i]]),
+};
+
+/* ============================================================
+   3. 应用状态
+   ============================================================ */
+const state = {
+  view:'overview', path:'pass', backend:'', apiKey:'', live:false,
+  approvals: DEMO.approvals.slice(), healthz:null, pendingCount:0,
+};
+
+/* ============================================================
+   4. 工具函数
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtMoney = n => '¥' + Number(n).toLocaleString('zh-CN', {maximumFractionDigits:2});
+const fmtTime = iso => { const d = new Date(iso); return d.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); };
+const lamp = cls => `<span class="lamp ${cls}"></span>`;
+let toastTimer = null;
+function toast(msg, cls='green'){
+  $('#toast-txt').textContent = msg;
+  const l = $('#toast-lamp'); l.className = 'lamp ' + cls;
+  $('#toast').classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>$('#toast').classList.remove('show'), 2600);
+}
+
+/* ============================================================
+   5. 渲染：总览
+   ============================================================ */
+function renderKpi(){
+  const kpis = [
+    { label:'MCP 工具', value:ALL_TOOLS.length, cls:'', note:'9 个工具文件 · 统一 register' },
+    { label:'角色白名单', value:ROLE_KEYS.length, cls:'blue', note:'tools/list 裁剪 + tools/call 校验' },
+    { label:'审批待办', value:state.pendingCount, cls:'amber', note:'GET /approvals?status=pending', id:'kpi-pending' },
+    { label:'写审批工具', value:1, cls:'green', note:'create_inbound_record 唯一拦截' },
+    { label:'双人审批阈值', value:'¥100K', cls:'violet', note:'amount_cny ≥ 100,000 → double_review=1', small:true },
+    { label:'审批超时', value:'120s', cls:'', note:'短轮询 0.5s · 超时置 expired', small:true },
+  ];
+  $('#kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.cls}">
+      <div class="k-label">${k.label}</div>
+      <div class="k-value" ${k.id?`id="${k.id}"`:''}>${k.value}${k.small?'':''}</div>
+      <div class="k-note">${k.note}</div>
+    </div>`).join('');
+}
+
+function renderFlow(){
+  const nodes = [
+    { seq:'01', name:'采购订单 PO', doc:'PO-20260818001', meta:'50000 × M-1001', st:'done' },
+    { seq:'02', name:'收货 GRN',   doc:'GRN-20260820-011', meta:'实收 50000 · 顺丰', st:'done' },
+    { seq:'03', name:'质检 IQC',   doc:'IQC-20260820-011', meta:'320 抽检 · 0 不良', st:'done' },
+    { seq:'04', name:'入库过账',   doc:'IN · create_inbound_record', meta:'¥45,600 · 审批拦截', st:'warn' },
+    { seq:'05', name:'库存预警',   doc:'InventoryAgent', meta:'M-1001 480 < 1,000', st:'warn' },
+  ];
+  const conn = ['pass','pass','warn','warn'];
+  $('#flow-track').innerHTML = nodes.map((n,i)=>{
+    const lampCls = n.st==='done'?'green':(n.st==='warn'?'amber':'off');
+    return `${i>0?`<div class="flow-conn ${conn[i-1]}"></div>`:''}
+      <div class="flow-node ${n.st}">
+        <div class="node-box">
+          <div class="n-seq">STAGE ${n.seq} — ${['ORDER','RECEIVE','INSPECT','POST','ALERT'][i]}</div>
+          <div class="n-name">${n.name}${lamp(lampCls)}</div>
+          <div class="n-doc">${n.doc}</div>
+          <div class="n-meta">${n.meta}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderGov(){
+  const chain = [
+    { seq:'1', name:'AuthRole', desc:'X-MIIRP-Key 头 → 角色解析，注入 miirp_client_id / miirp_role', stat:'双重拦截' },
+    { seq:'2', name:'RateLimit', desc:'滑动窗口限流，每 client_id 20 QPS / 60s 窗口', stat:'20 QPS' },
+    { seq:'3', name:'Audit', desc:'调用审计落库：键名:类型:sha256 摘要脱敏，TTL 180 天', stat:'值哈希' },
+    { seq:'4', name:'Approval', desc:'写工具拦截建单，双人审批状态机 + 决策注入', stat:'唯一入口' },
+    { seq:'5', name:'Logging', desc:'JSON 结构化日志，trace_id 经 contextvars 贯穿请求', stat:'trace_id' },
+    { seq:'6', name:'Timing', desc:'工具耗时采样入固定窗口直方图（P50/P95）', stat:'P50/P95' },
+    { seq:'7', name:'ErrorHandling', desc:'统一异常体系，对外错误脱敏（mask_error_details）', stat:'脱敏' },
+  ];
+  $('#gov-list').innerHTML = chain.map(g => `
+    <div class="gov-row">
+      <div class="g-seq">${g.seq.padStart(2,'0')}</div>
+      <div class="g-name">${g.name}</div>
+      <div class="g-desc">${g.desc}</div>
+      <div class="g-stat">${g.stat}</div>
+    </div>`).join('');
+}
+
+function renderActs(){
+  $('#act-list').innerHTML = DEMO.activities.map(a => `
+    <div class="act-row">
+      <span class="a-time">${a.time}</span>
+      <span class="a-tool">${a.tool}</span>
+      <span class="a-role">${a.role}</span>
+      <span class="a-msg">${a.msg}</span>
+      <span class="chip ${a.cls}">${a.st}</span>
+    </div>`).join('');
+}
+
+/* ============================================================
+   6. 渲染：审批中心
+   ============================================================ */
+function renderApprovals(){
+  const list = state.approvals;
+  $('#queue-count').textContent = `PENDING ${list.length}`;
+  const badge = $('#nav-badge');
+  badge.hidden = list.length === 0; badge.textContent = list.length;
+  state.pendingCount = list.length;
+  const pk = $('#kpi-pending'); if(pk) pk.textContent = list.length;
+
+  $('#approval-empty').hidden = list.length > 0;
+  $('#approval-tbody').innerHTML = list.map(a => `
+    <tr data-id="${a.id}">
+      <td class="a-id">${a.id}</td>
+      <td class="mono" style="font-size:11.5px">${a.tool_name}</td>
+      <td class="mono" style="font-size:11.5px;color:var(--tx1)">${a.proposer}</td>
+      <td class="a-amt ${a.double_review?'double':''}">${fmtMoney(a.amount_cny)}${a.double_review?' <span class="chip amber" style="font-size:9px;padding:0 5px">双人</span>':''}</td>
+      <td><span class="chip ${a.double_review?'amber':'blue'}">${a.double_review?'DOUBLE':'SINGLE'}</span></td>
+      <td><span class="chip amber">pending</span></td>
+      <td class="mono" style="font-size:11px;color:var(--tx2)">${fmtTime(a.created_at)}</td>
+    </tr>`).join('');
+
+  document.querySelectorAll('#approval-tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => openDrawer(tr.dataset.id));
+  });
+}
+
+function renderFsm(){
+  const steps = [
+    { name:'pending · 建单拦截', desc:'ApprovalMiddleware 拦截 create_inbound_record，写入 approval_requests（唯一入口，D1）', st:'active' },
+    { name:'单人审批 → approved', desc:'amount_cny < ¥100,000：单审批人 decide(approved=true) 即终态', st:'' },
+    { name:'双人审批 · 第一签', desc:'高价值单 double_review=1：第一签通过仍 pending，reviewer 记入', st:'' },
+    { name:'双人审批 · 第二签', desc:'第二签须为不同审批人（P0-3 异人校验），通过后置 approved', st:'' },
+    { name:'任一拒绝 → rejected', desc:'reject 即整体驳回，审批人角色须 ∈ APPROVE_ROLES（P0-2）', st:'fail' },
+    { name:'超时 120s → expired', desc:'wait_for_decision 轮询 0.5s，超时终态，幂等不可再改', st:'' },
+  ];
+  $('#fsm-track').innerHTML = steps.map((s,i) => `
+    <div class="fsm-step ${s.st}">
+      <div class="f-dot">${i+1}</div>
+      <div class="f-body">
+        <div class="f-name">${s.name}${s.st==='active'?`<span class="chip amber" style="font-size:9px">当前</span>`:''}</div>
+        <div class="f-desc">${s.desc}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* 审批详情抽屉 */
+let drawerApproval = null;
+function openDrawer(id){
+  const a = state.approvals.find(x => x.id === id); if(!a) return;
+  drawerApproval = a;
+  $('#drawer-title').textContent = `审批单 ${a.id}`;
+  const p = a.payload || {};
+  const fsmInfo = a.double_review
+    ? (a.reviewers && a.reviewers.length >= 1 ? `第一签已完成（${a.reviewers.join(', ')}）· 待第二签（须异人）` : '待第一签 · 双人审批')
+    : '单人审批 · 一次决策即终态';
+  $('#drawer-bd').innerHTML = `
+    <div class="d-sec">单据信息</div>
+    <div class="d-field"><div class="d-k">审批单号</div><div class="d-v mono" style="color:var(--blue)">${a.id}</div></div>
+    <div class="d-field"><div class="d-k">触发工具</div><div class="d-v mono">${a.tool_name}</div></div>
+    <div class="d-field"><div class="d-k">提议人</div><div class="d-v mono">${a.proposer}</div></div>
+    <div class="d-field"><div class="d-k">折合金额</div><div class="d-v mono">${fmtMoney(a.amount_cny)} ${a.double_review?'<span class="chip amber" style="font-size:9px">≥100K 双人</span>':''}</div></div>
+    <div class="d-field"><div class="d-k">审批模式</div><div class="d-v mono">${fsmInfo}</div></div>
+    <div class="d-field"><div class="d-k">correlation_id</div><div class="d-v mono" style="font-size:10.5px;color:var(--tx2)">${a.correlation_id || '—'}</div></div>
+    <div class="d-field"><div class="d-k">提交时间</div><div class="d-v mono">${a.created_at}</div></div>
+    <div class="d-sec">工具入参 payload</div>
+    <div class="d-json">${esc(JSON.stringify(p, null, 2))}</div>
+    <div class="d-sec">规则判定</div>
+    <div class="d-field"><div class="d-k">双人阈值</div><div class="d-v mono">${a.amount_cny >= 100000 ? '触发 · double_review=1' : '未触发 · 单人审批'}</div></div>
+    <div class="d-field"><div class="d-k">幂等键</div><div class="d-v mono">approval_requests.id（选项 B）</div></div>
+    <div class="d-field"><div class="d-k">审批人身份</div><div class="d-v mono">ctx state · miirp_client_id（不信任客户端传入）</div></div>`;
+  const approveBtn = $('#btn-drawer-approve');
+  const rejectBtn = $('#btn-drawer-reject');
+  const sameAsFirst = a.double_review && a.reviewers && a.reviewers.includes('wh-001');
+  approveBtn.disabled = sameAsFirst;
+  rejectBtn.disabled = sameAsFirst;
+  if(sameAsFirst) toast('双人审批第二签须异人：当前身份 wh-001 已签第一签', 'amber');
+  $('#scrim').classList.add('show');
+  $('#drawer').classList.add('show');
+}
+function closeDrawer(){ $('#scrim').classList.remove('show'); $('#drawer').classList.remove('show'); drawerApproval = null; }
+
+function decideApproval(approved){
+  const a = drawerApproval; if(!a) return;
+  if(a.double_review && a.reviewers && a.reviewers.includes('wh-001')){
+    toast('P0-3 异人校验拒绝：同一审批人不能连续两签', 'red'); return;
+  }
+  const idx = state.approvals.indexOf(a);
+  if(approved){
+    if(a.double_review){
+      if(!a.reviewers || a.reviewers.length === 0){
+        a.reviewers = ['wh-001'];
+        toast('第一签已记录 · 等待第二签（须异人）', 'amber');
+      } else {
+        a.reviewers.push('wh-001');
+        state.approvals.splice(idx,1); a.status = 'approved';
+        toast('双人审批完成 · 单据已 approved', 'green');
+      }
+    } else {
+      state.approvals.splice(idx,1); a.status = 'approved';
+      toast('审批通过 · 单据已 approved', 'green');
+    }
+  } else {
+    state.approvals.splice(idx,1); a.status = 'rejected';
+    toast('已驳回 · 单据 rejected（D6：任一拒签整体驳回）', 'red');
+  }
+  renderApprovals(); closeDrawer();
+}
+
+/* ============================================================
+   7. 渲染：业务链路
+   ============================================================ */
+function renderPipeline(){
+  const p = DEMO.pipeline[state.path];
+  $('#expert-grid').innerHTML = p.experts.map(e => `
+    <div class="panel expert">
+      <div class="e-head">
+        <div>
+          <div class="e-name">${e.name}</div>
+          <div class="e-role">${e.role}</div>
+        </div>
+        <span class="e-risk ${e.risk}">${e.risk === 'low' ? 'LOW 低风险' : 'HIGH 高风险'}</span>
+      </div>
+      <div class="e-reason">${e.reason}</div>
+      <div class="e-data">${e.data}</div>
+    </div>`).join('');
+
+  const riskZh = p.decision === 'approve' ? '风险全低 · 放行' : '多路高风险 · 拦截';
+  $('#decision-band').innerHTML = `
+    <div class="d-badge ${p.decision}">${p.decision === 'approve' ? 'APPROVE' : 'REJECT'}</div>
+    <div class="d-info">
+      <div><b>合规复核 · ReviewAgent</b>　决策：<b style="color:${p.decision==='approve'?'var(--green)':'var(--red)'}">${p.decisionZh}</b>　（${riskZh}）</div>
+      <div style="margin-top:4px">四路专家经 asyncio.gather 并行审查 → 规则引擎合成风险图谱 → 合规复核输出决策；决策与风险经 correlation_id 关联审计。</div>
+    </div>
+    <div class="d-correlation">correlation_id<br><span style="color:var(--blue)">${p.correlation}</span></div>`;
+
+  $('#doc-grid').innerHTML = p.docs.map(d => `
+    <div class="panel doc-card">
+      <div class="d-type">DOC ${d.type}${d.no === '—' ? '<span class="chip red" style="font-size:8.5px">未过账</span>' : ''}</div>
+      <div class="d-no">${d.no}</div>
+      ${d.rows.map(r => `<div class="d-row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}
+    </div>`).join('');
+}
+
+/* ============================================================
+   8. 渲染：角色权限
+   ============================================================ */
+function renderRbac(){
+  const matrix = $('#rbac-matrix');
+  const head = `<thead><tr><th style="min-width:180px">角色 \\ 工具</th>${ALL_TOOL_NAMES.map(t => `<th class="rot">${t}</th>`).join('')}</tr></thead>`;
+  const body = `<tbody>${ROLE_KEYS.map(r => {
+    const set = new Set(toolsOfRole(r.role));
+    return `<tr>
+      <th><span class="r-name">${r.role}</span><span class="r-key">${r.client} · ${r.key}</span></th>
+      ${ALL_TOOL_NAMES.map(t => `<td class="cell ${set.has(t)?'filled':'empty'}" data-role="${r.role}" data-tool="${t}"></td>`).join('')}
+    </tr>`;
+  }).join('')}</tbody>`;
+  matrix.innerHTML = head + body;
+
+  matrix.querySelectorAll('td.cell').forEach(td => {
+    td.addEventListener('mouseenter', () => {
+      $('#rbac-hint').textContent = `${td.dataset.role} → ${td.dataset.tool}`;
+    });
+  });
+
+  $('#key-tbody').innerHTML = ROLE_KEYS.map(r => `
+    <tr><td>${r.role}</td><td>${r.client}</td><td style="color:var(--amber)">${r.key}</td></tr>`).join('');
+
+  $('#rule-list').innerHTML = RULES.map((r,i) => `
+    <div class="rule-row">
+      <div class="r-idx">${String(i+1).padStart(2,'0')}</div>
+      <div class="r-txt">${r.txt}</div>
+      ${r.tag ? `<span class="r-tag chip ${r.cls}">${r.tag}</span>` : ''}
+    </div>`).join('');
+}
+
+/* ============================================================
+   9. 渲染：工具台
+   ============================================================ */
+function renderToolkit(){
+  $('#tool-cols').innerHTML = TOOL_MODULES.map(m => `
+    <div class="tool-mod">
+      <div class="tool-mod-hd">
+        <span class="m-seq">MOD ${m.seq}</span>
+        <span class="m-name">${m.mod}</span>
+        <span class="chip">${m.area}</span>
+        <span class="m-count">${m.tools.length} TOOL${m.tools.length>1?'S':''}</span>
+      </div>
+      ${m.tools.map(t => `
+        <div class="panel tool-item">
+          <div class="t-head">
+            <span class="t-name">${t.name}</span>
+            ${t.write ? '<span class="t-write">WRITE</span>' : '<span class="t-ro">READ</span>'}
+            ${t.name === 'create_inbound_record' ? '<span class="chip amber" style="font-size:9px;padding:0 6px">审批拦截</span>' : ''}
+            ${t.roles.length === 0 ? '<span class="chip" style="font-size:9px;padding:0 6px;color:var(--tx2)">无白名单</span>' : ''}
+          </div>
+          <div class="t-desc">入参：<span class="mono" style="color:var(--tx1)">${t.args}</span></div>
+          <div class="t-args"><b>→</b> ${t.ret}</div>
+          <div class="t-roles">${t.roles.map(r => `<span>${r}</span>`).join('') || '<span style="border-style:dashed">tools/list 不可见 · 仅供内部/种子场景</span>'}</div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+/* ============================================================
+   10. 渲染：系统指标
+   ============================================================ */
+function renderMetrics(){
+  const m = {
+    calls: 1284, errors: 11, p50: 22, p95: 96,
+  };
+  $('#metric-grid').innerHTML = [
+    { label:'累计工具调用', value:m.calls.toLocaleString(), note:'miirp_tool_calls_total · 会话累计', cls:'' },
+    { label:'错误率', value:(m.errors/m.calls*100).toFixed(2)+'%', note:'miirp_tool_errors_total · 含失败审计', cls:'red' },
+    { label:'延迟 P50', value:m.p50+'ms', note:'固定窗口直方图分位估算', cls:'green' },
+    { label:'延迟 P95', value:m.p95+'ms', note:'window_size=5000 · 防内存泄漏', cls:'amber' },
+  ].map(x => `
+    <div class="panel metric">
+      <div class="m-label">${x.label}<span class="u">CNT</span></div>
+      <div class="m-value" style="color:var(--${x.cls===''?'tx0':x.cls})">${x.value}</div>
+      <div class="m-note">${x.note}</div>
+    </div>`).join('');
+
+  const buckets = DEMO.hist;
+  const max = Math.max(...buckets.map(b=>b[1]));
+  $('#hist').innerHTML = buckets.map(([b,c]) => `
+    <div class="h-bar">
+      <div class="h-col" style="height:${Math.max(c/max*100,2)}%"><span class="h-val">${c}</span></div>
+      <div class="h-tick">${b>=1000?(b/1000)+'s':b}</div>
+    </div>`).join('');
+
+  $('#metric-tbody').innerHTML = DEMO.traces.map(t => `
+    <tr>
+      <td>${t.t}</td><td>${t.tool}</td><td>${t.who}</td>
+      <td>${lamp(t.cls)} <span style="color:var(--${t.cls==='amber'?'amber':(t.cls==='red'?'red':'tx1')})">${t.st}</span></td>
+      <td>${t.ms}</td>
+      <td style="font-size:10px;color:var(--tx3)">${t.corr}</td>
+    </tr>`).join('');
+}
+
+/* ============================================================
+   11. 后端对接（/healthz /approvals /metrics）+ 离线降级
+   ============================================================ */
+async function apiGet(path, withKey=true){
+  const headers = { 'Accept':'application/json' };
+  if(withKey && state.apiKey) headers['X-MIIRP-Key'] = state.apiKey;
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 5000);
+  try {
+    const res = await fetch(state.backend + path, { headers, signal:ctrl.signal });
+    clearTimeout(timer);
+    return { ok:res.ok, status:res.status, text:await res.text() };
+  } catch(e){ clearTimeout(timer); return { ok:false, status:0, text:String(e) }; }
+}
+
+async function ping(){
+  const r = await apiGet('/healthz', false);
+  if(r.ok){
+    try{
+      const h = JSON.parse(r.text);
+      state.healthz = h;
+      setSvcState(true, h);
+      return h;
+    }catch(e){ setSvcState(false); return null; }
+  }
+  setSvcState(false);
+  return null;
+}
+function setSvcState(ok, h){
+  const lamp = $('#svc-lamp'), txt = $('#svc-txt'), db = $('#svc-db');
+  if(ok && h){
+    lamp.className = 'lamp ' + (h.status === 'ok' ? 'green' : 'amber');
+    txt.textContent = h.status === 'ok' ? '服务正常' : '服务降级';
+    db.textContent = `db:${h.db ? 'ok' : 'down'} · v${h.version}`;
+  } else if(state.live){
+    lamp.className = 'lamp red';
+    txt.textContent = '连接异常';
+    db.textContent = '';
+  } else {
+    lamp.className = 'lamp off';
+    txt.textContent = '离线演示';
+    db.textContent = 'demo mode';
+  }
+}
+
+async function loadApprovals(){
+  if(!state.live){ renderApprovals(); return; }
+  const r = await apiGet('/approvals?status=pending');
+  if(r.ok){
+    try{
+      const list = JSON.parse(r.text);
+      state.approvals = Array.isArray(list) ? list : [];
+      renderApprovals();
+    }catch(e){ renderApprovals(); }
+  } else {
+    renderApprovals();
+    if(r.status === 403) toast('403 forbidden：该角色无权查询审批待办（需 warehouse-manager / compliance-officer）', 'red');
+    else toast(`审批接口不可达 (${r.status}) · 保持演示数据`, 'amber');
+  }
+}
+
+/* ============================================================
+   12. 交互
+   ============================================================ */
+function switchView(v){
+  state.view = v;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === v));
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
+  $('#main').scrollTop = 0;
+  if(v === 'approvals') loadApprovals();
+  if(v === 'metrics') renderMetrics();
+}
+
+function openConn(){
+  $('#conn-url').value = state.backend || 'http://127.0.0.1:8000';
+  renderRoleOpts();
+  $('#conn-modal').classList.add('show');
+}
+function closeConn(){ $('#conn-modal').classList.remove('show'); }
+
+let selRole = 'warehouse-manager';
+function renderRoleOpts(){
+  $('#role-grid').innerHTML = ROLE_KEYS.map(r => `
+    <div class="role-opt ${r.role === selRole ? 'sel' : ''}" data-role="${r.role}">
+      <span class="r-r">${r.role}</span>
+      <span style="color:var(--tx2)">${r.client}</span>
+      <span class="r-k">${r.key}</span>
+    </div>`).join('');
+  $('#role-grid').querySelectorAll('.role-opt').forEach(o => {
+    o.addEventListener('click', () => { selRole = o.dataset.role; renderRoleOpts(); });
+  });
+}
+
+async function testConn(){
+  const url = $('#conn-url').value.trim().replace(/\/+$/,'');
+  state.backend = url;
+  const h = await ping();
+  const lamp = $('#conn-lamp'), txt = $('#conn-status');
+  if(h){
+    lamp.className = 'lamp ' + (h.status==='ok'?'green':'amber');
+    txt.textContent = `已连通：status=${h.status} db=${h.db} version=${h.version}`;
+  } else {
+    lamp.className = 'lamp red';
+    txt.textContent = '无法连接（跨域需同源托管或后端 CORS；服务未启动则保持离线演示）';
+  }
+}
+
+function saveConn(){
+  const url = $('#conn-url').value.trim().replace(/\/+$/,'');
+  state.backend = url;
+  const rk = roleTools(selRole);
+  state.apiKey = rk.key || '';
+  state.live = !!url;
+  closeConn();
+  if(state.live){
+    toast(`已连接 ${url} · 身份 ${selRole}`, 'green');
+    ping().then(() => loadApprovals());
+  } else {
+    state.live = false; state.apiKey = '';
+    toast('已切换离线演示模式', 'amber');
+    setSvcState(false);
+    loadApprovals();
+  }
+  if(!window.__healthTimer) window.__healthTimer = setInterval(() => { if(state.live) ping(); }, 15000);
+}
+
+/* 初始化 */
+function init(){
+  renderKpi(); renderFlow(); renderGov(); renderActs();
+  renderApprovals(); renderFsm(); renderPipeline();
+  renderRbac(); renderToolkit(); renderMetrics();
+  setSvcState(false);
+
+  document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => switchView(n.dataset.view)));
+  $('#btn-conn').addEventListener('click', openConn);
+  $('#conn-close').addEventListener('click', closeConn);
+  $('#btn-test-conn').addEventListener('click', testConn);
+  $('#btn-demo').addEventListener('click', () => { $('#conn-url').value = ''; saveConn(); });
+  $('#btn-save-conn').addEventListener('click', saveConn);
+  $('#btn-refresh-appr').addEventListener('click', loadApprovals);
+  $('#drawer-close').addEventListener('click', closeDrawer);
+  $('#scrim').addEventListener('click', closeDrawer);
+  $('#btn-drawer-approve').addEventListener('click', () => decideApproval(true));
+  $('#btn-drawer-reject').addEventListener('click', () => decideApproval(false));
+  document.querySelectorAll('.path-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.path-tab').forEach(x => x.classList.toggle('active', x === t));
+    state.path = t.dataset.path; renderPipeline();
+  }));
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

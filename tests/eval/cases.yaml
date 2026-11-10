@@ -1,0 +1,219 @@
+# MIIRP Agent 行为评测用例集（M3-05 / A8）
+#
+# 事实源：能力说明 §9.1（c01-c04）、§5 审查规则、开发文档 §2.4 阈值；
+#         数据源 app/services/* 种子数据（data_contract §4，_fake_call 直连保证确定性）。
+#
+# 字段语义：
+#   mode       mock（门禁基准：走 ReviewAgent + 规则引擎，确定性）
+#              llm-compare（仅 LLM 对比扩展，能力说明 §9.3；mock 门禁不统计该模式）
+#   expected   期望决策 approve | review | reject
+#
+# 边界口径（与规则引擎严格一致，实测确认）：
+#   数量 >5% 触发（恰好 5% 不触发）；价格偏离中线 >15%（恰好 15% 不触发）；
+#   汇率波动 >8%（恰好 8% 不触发）；准时率 <80%；合格率 <95%。
+#   汇率因子在 mock 模式下无法经 ReviewAgent.review 输入注入（price_check 恒传 0），
+#   汇率 8% 边界由 run_evals.py 的 rule_layer_checks 直连 price_risk 校验（基准正确性回归）。
+cases:
+  # ---- 能力说明 §9.1 四基线用例（c01-c04，数据与文档逐字一致）----
+  - id: c01
+    name: 全部正常 → 通过（§9.1 c01）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0071
+    currency: USD
+    expected: approve
+    mode: mock
+  - id: c02
+    name: 数量超收 8% → 拒绝（§9.1 c02）
+    grn_no: GRN-20260820-012
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-012
+    sku: M-1001
+    supplier_id: SUP-01
+    batch_no: B20260820012
+    quantity: 54000
+    unit_price: 0.0086
+    currency: USD
+    expected: reject
+    mode: mock
+  - id: c03
+    name: 供应商高风险 → 拒绝（§9.1 c03）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-01
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0071
+    currency: USD
+    expected: reject
+    mode: mock
+  - id: c04
+    name: 追溯链断裂 → 拒绝（§9.1 c04）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820012
+    quantity: 50000
+    unit_price: 0.0071
+    currency: USD
+    expected: reject
+    mode: mock
+
+  # ---- 数量 5% 阈值边界（恰好 vs 超阈值）----
+  - id: c05
+    name: 数量恰好 5% → 通过（边界：恰好阈值不触发）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 52500
+    unit_price: 0.0071
+    currency: USD
+    expected: approve
+    mode: mock
+  - id: c06
+    name: 数量超收 6% → 拒绝（边界：超阈值触发）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 53000
+    unit_price: 0.0071
+    currency: USD
+    expected: reject
+    mode: mock
+
+  # ---- 价格 15% 阈值边界（恰好 vs 超阈值；偏离报价区间中线，SUP-02/M-1001 mid=0.00795）----
+  - id: c07
+    name: 价格恰好 15% → 通过（边界：恰好阈值不触发）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0091425
+    currency: USD
+    expected: approve
+    mode: mock
+  - id: c08
+    name: 价格超 15%（15.2%）→ 拒绝（边界：超阈值触发）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0091584
+    currency: USD
+    expected: reject
+    mode: mock
+
+  # ---- 汇率波动场景（8% 边界规则层校验见 run_evals.py rule_layer_checks）----
+  - id: c09
+    name: 进口物料汇率场景（USD 价格正常）→ 通过
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0071
+    currency: USD
+    expected: approve
+    mode: mock
+
+  # ---- 正常通过补充（国产 CNY 物料）----
+  - id: c10
+    name: 国产物料（CNY）全部正常 → 通过
+    grn_no: GRN-20260820-011
+    po_no: PO-20260819002
+    iqc_no: IQC-20260820-011
+    sku: M-2002
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 2000
+    unit_price: 18.5
+    currency: CNY
+    expected: approve
+    mode: mock
+
+  # ---- 多风险组合与缺量方向 ----
+  - id: c11
+    name: 价格超 15% + 供应商高风险 → 拒绝（组合风险）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-01
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0095
+    currency: USD
+    expected: reject
+    mode: mock
+  - id: c12
+    name: 数量缺量 6% → 拒绝（缺量方向，§2.4 超收/缺量同阈值）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 47000
+    unit_price: 0.0071
+    currency: USD
+    expected: reject
+    mode: mock
+
+  # ---- review 三态覆盖（LLM 对比扩展）----
+  # mock 基准下 review 决策不可达：规则引擎四路专家恒输出 high/low（review_rules.py），
+  # compliance_decision 的 review/missing 分支仅 LLM 模式或解析失败兜底可达（能力说明 §3.6）。
+  # 本用例作为 LLM 对比扩展（§9.3），不纳入 mock 门禁指标；mock 运行仅展示 got。
+  - id: c13
+    name: 价格恰好 15% 边界 → 转人工复核（LLM 对比用例）
+    grn_no: GRN-20260820-011
+    po_no: PO-20260818001
+    iqc_no: IQC-20260820-011
+    sku: M-1001
+    supplier_id: SUP-02
+    batch_no: B20260820011
+    quantity: 50000
+    unit_price: 0.0091425
+    currency: USD
+    expected: review
+    mode: llm-compare
+
+# ---- 单 Agent 库存预警（能力说明 §8 / api_contract §7，独立小节，不入 ReviewAgent 门禁指标）----
+# 建议订货量 = avg_daily_usage * replenish_days + (safety_stock - stock_qty)，向上取整 100 的倍数：
+#   M-1001: 620*14 + (15000-12000) = 11680 → 11700
+#   M-2002: 860 > 500 不触发 → 0
+inventory:
+  - id: inv-01
+    name: M-1001 低于安全线 → 预警并给出建议订货量
+    sku: M-1001
+    replenish_days: 14
+    expected_alert: true
+    expected_suggested_qty: 11700
+  - id: inv-02
+    name: M-2002 高于安全线 → 不预警
+    sku: M-2002
+    replenish_days: 14
+    expected_alert: false
+    expected_suggested_qty: 0

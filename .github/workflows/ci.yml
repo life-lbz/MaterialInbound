@@ -1,0 +1,70 @@
+# MIIRP CI 质量流水线（M5-01 / A9）
+# 依据：开发文档 §4.8、§9；环境说明 §9.3、§10；协作方案 §3.10
+# 范围：仅 lint-test-eval 与 security-scan 两个 job；不含 build-push / deploy-prod
+#      （Dockerfile / compose / nginx / 证书属部署范围，协作方案 §1.2，本次不做）
+#
+# 环境方案说明：采用 setup-python + pip install -r requirements.txt
+#   - requirements.txt 为依赖唯一事实源（区间约束），CI 隔离环境直接安装即可复现质量门禁；
+#   - 本地 conda 环境（env.yml）为确定版本锁定（Python 3.12、ruff 0.16.3、pytest 9.1.1），
+#     与 requirements.txt 配套使用（环境说明 §2），CI 与本地执行同一组命令、同一门禁线。
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  # ---- 质量门禁：ruff 静态检查 → pytest 单测（覆盖率 ≥80%）→ Agent 评测门禁 ----
+  lint-test-eval:
+    name: lint-test-eval（质量门禁）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # 与 env.yml 一致（环境说明 §2）
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+      - name: ruff 静态检查（app/ client/ tests/ scripts/）
+        run: ruff check app/ client/ tests/ scripts/
+      - name: pytest 单测（覆盖率 <80% 即失败）
+        run: pytest tests/ --cov=app --cov-report=term-missing --cov-fail-under=80
+      - name: Agent 评测门禁（accuracy=1.0 且 FNR=0.0，失败即 CI 失败）
+        run: python scripts/run_evals.py
+
+  # ---- 依赖/文件系统漏洞扫描：trivy，HIGH/CRITICAL 阻断（exit-code=1，不得静默忽略）----
+  security-scan:
+    name: security-scan（trivy fs）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy fs scan（HIGH/CRITICAL 即失败）
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  # ---- 镜像构建（P3 整改落地）：验证 Dockerfile 可构建，不推送 ----
+  # 生产发布（GHCR push + SSH 部署）需配置仓库 Secrets（GHCR_TOKEN / DEPLOY_HOST 等），
+  # 有凭据后在此 job 追加 push 步骤（tag v* 触发），或在 CD 流水线中实现。
+  build-image:
+    name: build-image（Docker 镜像可构建性验证）
+    runs-on: ubuntu-latest
+    needs: lint-test-eval
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build miirp image（不推送）
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployment/Dockerfile
+          push: false
+          tags: miirp:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
